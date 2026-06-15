@@ -107,6 +107,7 @@ Durchsucht alle Emails, zählt Absender und prüft gegen DNSBLs (Spamhaus, SpamC
 <button class="btn-secondary btn-sm" onclick="deselectAll()">Alle abwählen</button>
 <button class="btn-secondary btn-sm" onclick="selectSpam()">Spammer auswählen</button>
 <button class="btn-secondary btn-sm" onclick="selectHighCount(5)">Ab 5 Emails</button>
+<button class="btn-primary btn-sm" onclick="rescan()">↻ Neu scannen</button>
 <span class="spacer"></span>
 <span id="selectedInfo" style="color:#94a3b8;font-size:0.85rem;"></span>
 </div>
@@ -382,6 +383,26 @@ delete MARKED_SPAMMERS[sender];
 renderStats();
 applyFilters();
 }
+}
+
+async function rescan() {
+if (!confirm('Aktuelle Ansicht zurücksetzen und neu scannen?')) return;
+SPAM_STATUS = {};
+MARKED_SPAMMERS = {};
+SENDER_DATA = [];
+$('senderTable').innerHTML = '';
+$('log').innerHTML = '';
+$('deletePreview').innerHTML = '';
+$('selectedInfo').textContent = '';
+$('deleteBtn').textContent = 'Löschen starten';
+$('deleteBtn').disabled = false;
+hide('analyseCard');
+hide('deleteCard');
+show('scanCard');
+$('scanBtn').disabled = false;
+$('scanProgressBar').classList.add('hidden');
+$('scanStatus').textContent = '';
+await startScan();
 }
 
 async function loadSpammers() {
