@@ -1,0 +1,15 @@
+[Unit]
+Description=Archiver Spam Cleaner - Auto-Cleanup
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/archiver-spam-cleaner
+ExecStart=/usr/bin/python3 server.py --cron \
+  --api-url http://192.168.2.130:4000 \
+  --api-write-url http://192.168.2.130:4000
+Environment=ARCHIVER_ADMIN_EMAIL=admin@example.com
+Environment=ARCHIVER_ADMIN_PASSWORD=yourpassword
+StandardOutput=journal
+StandardError=journal

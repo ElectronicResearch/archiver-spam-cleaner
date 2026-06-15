@@ -1,0 +1,10 @@
+[Unit]
+Description=Archiver Spam Cleaner - Periodische Spam-Bereinigung (alle 6 Stunden)
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

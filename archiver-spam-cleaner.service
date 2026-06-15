@@ -1,0 +1,17 @@
+[Unit]
+Description=Archiver Spam Cleaner - Web UI fuer RBL-Check und Spam-Bereinigung
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/archiver-spam-cleaner
+ExecStart=/usr/bin/python3 server.py --port 5000 --api-url http://192.168.2.130:4000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

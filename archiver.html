@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archiver Spam Cleaner</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin-bottom: 20px; color: #f8fafc; }
+h2 { font-size: 1.1rem; margin: 20px 0 10px; color: #94a3b8; }
+.card { background: #1e293b; border-radius: 8px; padding: 20px; margin-bottom: 20px; border: 1px solid #334155; }
+label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; }
+input[type="email"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid #475569; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 0.95rem; margin-bottom: 12px; }
+button { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: opacity 0.2s; }
+button:hover { opacity: 0.85; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: #3b82f6; color: white; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-secondary { background: #475569; color: white; }
+.btn-success { background: #22c55e; color: white; }
+.btn-warn { background: #eab308; color: black; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+.btn-xs { padding: 3px 8px; font-size: 0.7rem; }
+.status { padding: 12px; border-radius: 6px; margin: 10px 0; font-size: 0.9rem; }
+.status-info { background: #1e3a5f; border: 1px solid #3b82f6; }
+.status-success { background: #14532d; border: 1px solid #22c55e; }
+.status-error { background: #7f1d1d; border: 1px solid #ef4444; }
+.status-warn { background: #713f12; border: 1px solid #eab308; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+th { background: #334155; color: #94a3b8; font-weight: 600; position: sticky; top: 0; }
+tr:hover { background: #334155; }
+input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.badge-red { background: #7f1d1d; color: #fca5a5; }
+.badge-yellow { background: #713f12; color: #fde047; }
+.badge-green { background: #14532d; color: #86efac; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 15px 0; }
+.toolbar .spacer { flex: 1; }
+.search-box { padding: 8px 12px; border: 1px solid #475569; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 0.9rem; width: 300px; }
+.stats { display: flex; gap: 20px; flex-wrap: wrap; margin: 15px 0; }
+.stat { text-align: center; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: background 0.2s; }
+.stat:hover { background: #334155; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+.stat-label { font-size: 0.75rem; color: #64748b; }
+.progress-bar { width: 100%; height: 6px; background: #334155; border-radius: 3px; overflow: hidden; margin: 10px 0; }
+.progress-fill { height: 100%; background: #3b82f6; transition: width 0.3s; }
+#log { max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; padding: 10px; background: #0f172a; border-radius: 6px; border: 1px solid #334155; margin-top: 10px; }
+#log .log-entry { padding: 2px 0; border-bottom: 1px solid #1e293b; }
+.log-ok { color: #86efac; }
+.log-warn { color: #fde047; }
+.log-err { color: #fca5a5; }
+.log-info { color: #93c5fd; }
+.hidden { display: none; }
+.mono { font-family: monospace; font-size: 0.85rem; }
+.spam-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.spam-yes { background: #ef4444; }
+.spam-flagged { background: #eab308; }
+.spam-no { background: #22c55e; }
+.spam-unknown { background: #64748b; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Archiver Spam Cleaner</h1>
+
+<!-- Login -->
+<div class="card" id="loginCard">
+<h2>Login</h2>
+<label>Email</label>
+<input type="email" id="email" placeholder="admin@example.com">
+<label>Passwort</label>
+<input type="password" id="password" placeholder="Passwort">
+<button class="btn-primary" id="loginBtn" onclick="login()">Verbinden</button>
+<div id="loginStatus"></div>
+</div>
+
+<!-- Scan -->
+<div class="card hidden" id="scanCard">
+<h2>Absender scannen</h2>
+<p style="color:#94a3b8;margin-bottom:12px;">
+Durchsucht alle Emails, zählt Absender und prüft gegen DNSBLs (Spamhaus, SpamCop, Barracuda, SORBS).
+</p>
+<button class="btn-primary" id="scanBtn" onclick="startScan()">Scannen starten</button>
+<div class="progress-bar hidden" id="scanProgressBar">
+<div class="progress-fill" id="scanProgress" style="width:0%"></div>
+</div>
+<div id="scanStatus"></div>
+</div>
+
+<!-- Analyse -->
+<div class="card hidden" id="analyseCard">
+<h2>Absender Analyse</h2>
+<div class="stats" id="stats"></div>
+<div class="toolbar">
+<select class="search-box" id="spamFilter" onchange="applyFilters()" style="width:auto;">
+<option value="all">Alle Absender</option>
+<option value="spam">Nur Spam (RBL/Blacklist)</option>
+<option value="flagged">Nur manuell markiert</option>
+<option value="clean">Nur clean</option>
+<option value="unknown">Nur ungeprüft</option>
+</select>
+<input type="text" class="search-box" id="searchBox" placeholder="Absender suchen..." oninput="applyFilters()">
+<button class="btn-secondary btn-sm" onclick="selectAll()">Alle auswählen</button>
+<button class="btn-secondary btn-sm" onclick="deselectAll()">Alle abwählen</button>
+<button class="btn-secondary btn-sm" onclick="selectSpam()">Spammer auswählen</button>
+<button class="btn-secondary btn-sm" onclick="selectHighCount(5)">Ab 5 Emails</button>
+<span class="spacer"></span>
+<span id="selectedInfo" style="color:#94a3b8;font-size:0.85rem;"></span>
+</div>
+<div style="max-height:500px;overflow-y:auto;">
+<table>
+<thead>
+<tr>
+<th><input type="checkbox" id="checkAll" onchange="toggleAll(this)"></th>
+<th>Status</th>
+<th>Absender</th>
+<th>Anzahl</th>
+<th>Aktion</th>
+</tr>
+</thead>
+<tbody id="senderTable"></tbody>
+</table>
+</div>
+</div>
+
+<!-- Löschen -->
+<div class="card hidden" id="deleteCard">
+<h2>Ausgewählte Absender löschen</h2>
+<p style="color:#94a3b8;margin-bottom:12px;">Alle Emails der ausgewählten Absender werden permanent gelöscht.</p>
+<div id="deletePreview"></div>
+<div class="toolbar" style="margin-top:15px;">
+<button class="btn-danger" id="deleteBtn" onclick="deleteSelected()">Löschen starten</button>
+<span class="spacer"></span>
+</div>
+<div id="log"></div>
+</div>
+</div>
+
+<script>
+const BACKEND = '';
+let TOKEN = null;
+let SENDER_DATA = [];
+let SCAN_RESULT = { total_emails: 0, total_senders: 0 };
+let SPAM_STATUS = {};
+let MARKED_SPAMMERS = {};
+let DELETE_TOTAL = 0;
+let DELETE_DONE = 0;
+let DELETE_OK = 0;
+let DELETE_FAIL = 0;
+
+function $(id) { return document.getElementById(id); }
+function show(id) { $(id).classList.remove('hidden'); }
+function hide(id) { $(id).classList.add('hidden'); }
+
+function setStatus(id, msg, type) {
+const el = $(id);
+if (type) {
+el.className = 'status status-' + type;
+el.textContent = msg;
+} else {
+el.innerHTML = msg;
+}
+}
+
+async function api(method, path, body) {
+const opts = {
+method,
+headers: {}
+};
+if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+if (body) {
+opts.headers['Content-Type'] = 'application/json';
+opts.body = JSON.stringify(body);
+}
+const r = await fetch(BACKEND + path, opts);
+const text = await r.text();
+try { return JSON.parse(text); } catch(e) { return { raw: text }; }
+}
+
+async function login() {
+const email = $('email').value.trim();
+const password = $('password').value;
+if (!email || !password) { setStatus('loginStatus', 'Email und Passwort eingeben', 'error'); return; }
+$('loginBtn').disabled = true;
+const res = await api('POST', '/v1/auth/login', { email, password });
+const token = res.access_token || res.accessToken;
+if (token) {
+TOKEN = token;
+setStatus('loginStatus', 'Verbunden als ' + (res.user?.email || email), 'success');
+hide('loginCard');
+show('scanCard');
+} else {
+setStatus('loginStatus', 'Login fehlgeschlagen: ' + (res.message || JSON.stringify(res)), 'error');
+}
+$('loginBtn').disabled = false;
+}
+
+async function startScan() {
+$('scanBtn').disabled = true;
+show('scanProgressBar');
+setStatus('scanStatus', 'Sammle Emails und analysiere Absender... (das kann etwas dauern)', 'info');
+
+const res = await api('POST', '/api/scan', { token: TOKEN });
+
+if (res.senders) {
+SCAN_RESULT = { total_emails: res.total_emails, total_senders: res.total_senders };
+SENDER_DATA = res.senders.map(s => ({ sender: s.sender, count: s.count, ids: s.ids || [] }));
+
+SPAM_STATUS = {};
+for (const s of res.senders) {
+if (s.spam) {
+SPAM_STATUS[s.sender] = { spam: true, reason: s.reason || 'auto' };
+}
+}
+
+setStatus('scanStatus', `${res.total_emails} Emails, ${res.total_senders} Absender gefunden. ${res.spam_senders.length} Spam-Verdacht.`, res.spam_senders.length ? 'warn' : 'success');
+
+renderStats();
+renderTable(SENDER_DATA);
+hide('scanCard');
+show('analyseCard');
+show('deleteCard');
+
+loadSpammers();
+
+if (res.errors && res.errors.length) {
+console.warn('Scan errors:', res.errors);
+}
+} else {
+setStatus('scanStatus', 'Fehler: ' + JSON.stringify(res), 'error');
+}
+
+$('scanBtn').disabled = false;
+hide('scanProgressBar');
+}
+
+function renderStats() {
+const spam = SENDER_DATA.filter(s => SPAM_STATUS[s.sender]?.spam).length;
+const flagged = SENDER_DATA.filter(s => MARKED_SPAMMERS[s.sender]).length;
+const clean = SENDER_DATA.filter(s => SPAM_STATUS[s.sender] && !SPAM_STATUS[s.sender].spam && !MARKED_SPAMMERS[s.sender]).length;
+const unknown = SENDER_DATA.filter(s => !SPAM_STATUS[s.sender] && !MARKED_SPAMMERS[s.sender]).length;
+
+$('stats').innerHTML = `
+<div class="stat" onclick="setFilter('all')">
+<div class="stat-value">${SCAN_RESULT.total_emails}</div>
+<div class="stat-label">Emails</div>
+</div>
+<div class="stat" onclick="setFilter('all')">
+<div class="stat-value">${SENDER_DATA.length}</div>
+<div class="stat-label">Absender</div>
+</div>
+<div class="stat" onclick="setFilter('spam')">
+<div class="stat-value">${spam}</div>
+<div class="stat-label">Spam (RBL)</div>
+</div>
+<div class="stat" onclick="setFilter('flagged')">
+<div class="stat-value">${flagged}</div>
+<div class="stat-label">Manuell</div>
+</div>
+<div class="stat" onclick="setFilter('clean')">
+<div class="stat-value">${clean}</div>
+<div class="stat-label">Clean</div>
+</div>
+<div class="stat" onclick="setFilter('unknown')">
+<div class="stat-value">${unknown}</div>
+<div class="stat-label">Ungeprüft</div>
+</div>
+`;
+}
+
+function setFilter(val) {
+$('spamFilter').value = val;
+applyFilters();
+}
+
+function applyFilters() {
+const q = $('searchBox').value.toLowerCase();
+const filter = $('spamFilter').value;
+
+let filtered = SENDER_DATA;
+
+if (filter === 'spam') {
+filtered = filtered.filter(s => SPAM_STATUS[s.sender]?.spam);
+} else if (filter === 'flagged') {
+filtered = filtered.filter(s => MARKED_SPAMMERS[s.sender]);
+} else if (filter === 'clean') {
+filtered = filtered.filter(s => SPAM_STATUS[s.sender] && !SPAM_STATUS[s.sender].spam && !MARKED_SPAMMERS[s.sender]);
+} else if (filter === 'unknown') {
+filtered = filtered.filter(s => !SPAM_STATUS[s.sender] && !MARKED_SPAMMERS[s.sender]);
+}
+
+if (q) {
+filtered = filtered.filter(s => s.sender.toLowerCase().includes(q));
+}
+
+renderTable(filtered);
+}
+
+function renderTable(data) {
+if (!data) data = SENDER_DATA;
+const tbody = $('senderTable');
+tbody.innerHTML = '';
+for (const s of data) {
+const status = SPAM_STATUS[s.sender];
+const marked = MARKED_SPAMMERS[s.sender];
+
+let statusClass, statusLabel;
+if (marked) {
+statusClass = 'spam-flagged'; statusLabel = 'Markiert';
+} else if (status?.spam) {
+statusClass = 'spam-yes'; statusLabel = 'Spam';
+} else if (status) {
+statusClass = 'spam-no'; statusLabel = 'Clean';
+} else {
+statusClass = 'spam-unknown'; statusLabel = '?';
+}
+
+let actionHtml;
+if (marked) {
+actionHtml = `<button class="btn-success btn-xs" onclick="unmarkSpam('${escHtml(s.sender)}')">Entmarkieren</button>`;
+} else if (status?.spam) {
+actionHtml = `<button class="btn-warn btn-xs" onclick="markSpam('${escHtml(s.sender)}', ${s.count})">Bestätigen</button>`;
+} else {
+actionHtml = `<button class="btn-secondary btn-xs" onclick="markSpam('${escHtml(s.sender)}', ${s.count})">Als Spam</button>`;
+}
+
+const tr = document.createElement('tr');
+tr.innerHTML = `
+<td><input type="checkbox" class="sender-check" data-sender="${escHtml(s.sender)}" data-count="${s.count}" onchange="updateSelected()"></td>
+<td><span class="spam-indicator ${statusClass}"></span><span style="font-size:0.75rem;color:#94a3b8;">${statusLabel}</span></td>
+<td class="mono">${escHtml(s.sender)}</td>
+<td><span class="badge ${s.count>=20?'badge-red':s.count>=5?'badge-yellow':'badge-green'}">${s.count}</span></td>
+<td>${actionHtml}</td>
+`;
+tbody.appendChild(tr);
+}
+updateSelected();
+}
+
+function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function updateSelected() {
+const checked = document.querySelectorAll('.sender-check:checked');
+let total = 0;
+checked.forEach(c => total += parseInt(c.dataset.count));
+$('selectedInfo').textContent = `${checked.length} Absender, ${total} Emails`;
+$('deletePreview').innerHTML = checked.length
+? `<span class="status status-warn">${checked.length} Absender = ${total} Emails werden gelöscht</span>`
+: '';
+}
+
+function selectAll() { document.querySelectorAll('.sender-check').forEach(c => c.checked=true); updateSelected(); }
+function deselectAll() { document.querySelectorAll('.sender-check').forEach(c => c.checked=false); updateSelected(); }
+function selectHighCount(n) { document.querySelectorAll('.sender-check').forEach(c => c.checked=parseInt(c.dataset.count)>=n); updateSelected(); }
+function selectSpam() {
+document.querySelectorAll('.sender-check').forEach(c => {
+const sender = c.dataset.sender;
+c.checked = !!(SPAM_STATUS[sender]?.spam || MARKED_SPAMMERS[sender]);
+});
+updateSelected();
+}
+function toggleAll(cb) { document.querySelectorAll('.sender-check').forEach(c => c.checked=cb.checked); updateSelected(); }
+
+// ─── Spammer Markieren ─────────────────────────────────────────────────
+
+async function markSpam(sender, count) {
+const res = await api('POST', '/api/spammers', { senders: [sender], reason: 'manuell', count });
+if (res.ok) {
+MARKED_SPAMMERS[sender] = true;
+renderStats();
+applyFilters();
+}
+}
+
+async function unmarkSpam(sender) {
+const res = await api('DELETE', `/api/spammers/${encodeURIComponent(sender)}`);
+if (res.ok) {
+delete MARKED_SPAMMERS[sender];
+renderStats();
+applyFilters();
+}
+}
+
+async function loadSpammers() {
+const res = await api('GET', '/api/spammers');
+if (res.spammers) {
+MARKED_SPAMMERS = {};
+for (const s of res.spammers) {
+MARKED_SPAMMERS[s.sender] = true;
+}
+renderStats();
+applyFilters();
+}
+}
+
+// ─── Delete ────────────────────────────────────────────────────────────
+
+function log(msg, type) {
+const el = $('log');
+const d = document.createElement('div');
+d.className = 'log-entry log-' + type;
+d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+el.appendChild(d);
+el.scrollTop = el.scrollHeight;
+}
+
+function deleteProgress() {
+$('deletePreview').innerHTML = `<span class="status status-warn">Lösche... ${DELETE_DONE}/${DELETE_TOTAL} (${DELETE_OK} ok, ${DELETE_FAIL} Fehler)</span>`;
+}
+
+async function deleteSelected() {
+const checked = document.querySelectorAll('.sender-check:checked');
+if (!checked.length) { alert('Keine Absender ausgewählt'); return; }
+let totalEmails = 0;
+const senders = [];
+checked.forEach(c => {
+totalEmails += parseInt(c.dataset.count);
+senders.push(c.dataset.sender);
+});
+if (!confirm(`${totalEmails} Emails von ${senders.length} Absendern LÖSCHEN?`)) return;
+
+$('deleteBtn').disabled = true;
+$('log').innerHTML = '';
+$('deleteBtn').textContent = 'Löschen läuft...';
+DELETE_TOTAL = senders.length;
+DELETE_DONE = 0;
+DELETE_OK = 0;
+DELETE_FAIL = 0;
+deleteProgress();
+
+for (const sender of senders) {
+log(`Lösche ${sender}...`, 'info');
+try {
+const res = await api('POST', '/api/delete-spam', { token: TOKEN, senders: [sender] });
+if (res.error) {
+DELETE_FAIL++;
+log(`  ${res.error}`, 'err');
+} else {
+DELETE_OK += res.deleted || 0;
+DELETE_FAIL += res.errors || 0;
+const errMsg = res.details?.[0]?.first_error;
+const msg = `${res.deleted || 0} gelöscht, ${res.errors || 0} Fehler`;
+log(`  ${msg}${errMsg ? ' - ' + errMsg : ''}`, res.errors ? 'warn' : 'ok');
+}
+} catch (e) {
+DELETE_FAIL++;
+log(`  Fehler: ${e}`, 'err');
+}
+DELETE_DONE++;
+deleteProgress();
+}
+
+log(`\nFERTIG: ${DELETE_OK} gelöscht, ${DELETE_FAIL} Fehler`, DELETE_FAIL ? 'warn' : 'success');
+$('deleteBtn').textContent = 'Löschen starten';
+$('deleteBtn').disabled = false;
+}
+</script>
+</body>
+</html>
